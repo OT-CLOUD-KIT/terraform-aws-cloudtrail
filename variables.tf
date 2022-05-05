@@ -1,8 +1,9 @@
 variable "name" {
   type        = string
-  default     = "Cloudtrail"
+  default     = "cloudtrail"
   description = "Name of the cloudtrail"
 }
+
 variable "enable_log_file_validation" {
   type        = bool
   default     = true
@@ -27,26 +28,22 @@ variable "enable_logging" {
   description = "Enable logging for the trail"
 }
 
+variable "create_bucket" {
+  type = bool
+  default = true
+  description = "If true, it will create a new bucket with policy. If false, you will have to pass a bucket name"
+}
+
 variable "s3_bucket_name" {
   type        = string
-  description = "S3 bucket name for CloudTrail logs"
+  default     = ""
+  description = "Provide S3 bucket name for CloudTrail logs if you specify create_bucket=false"
 }
 
 variable "s3_key_prefix" {
   type        = string
+  default     = null
   description = "S3 bucket prefix for CloudTrail logs"
-}
-
-variable "cloud_watch_logs_role_arn" {
-  type        = string
-  description = "Specifies the role for the CloudWatch Logs endpoint to assume to write to a user’s log group"
-  default     = ""
-}
-
-variable "cloud_watch_logs_group_arn" {
-  type        = string
-  description = "Specifies a log group name using an Amazon Resource Name (ARN), that represents the log group to which CloudTrail logs will be delivered"
-  default     = ""
 }
 
 variable "event_selector" {
@@ -60,8 +57,19 @@ variable "event_selector" {
     }))
   }))
 
-  description = "Specifies an event selector for enabling data event logging."
+  description = "Specifies an event selector for enabling data event logging. Conflicts with advanced_event_selector"
   default     = []
+}
+
+variable "advanced_event_selector" {
+  description = "specifies an advanced event selector for enabling data event logging. Conflicts with event_selector"
+
+  validation {
+    condition = length(setsubtract(toset(flatten([for i in var.advanced_event_selector: [for j in i.field_selector: j.field]])),["readOnly", "eventSource", "eventName", "eventCategory", "resources.type", "resources.ARN"])) == 0
+    error_message = "Error: Field should be one of readOnly, eventSource, eventName, eventCategory, resources.type, resources.ARN ."
+  }
+
+  default = []
 }
 
 variable "kms_key_arn" {
@@ -83,20 +91,18 @@ variable "sns_topic_name" {
 }
 
 variable "tags" {
+  type = map
   description = "Tags for Cloudtrail"
   default     = {}
 }
 
 variable "insight_selector" {
-  default = {
-    insight_type = "ApiCallRateInsight"
-  }
+  type = map
+  default = {}
 }
 
-variable "create_insight_selector" {
-  default = false
+variable "create_log_group" {
+  default = "true"
+  type = bool
+  description = "If this is provided, cloudtrail will be configured with cloudwatch logging."
 }
-
-variable "cloud_watch_log_group_name" {}
-
-variable "cloud_watch_log_stream" {}

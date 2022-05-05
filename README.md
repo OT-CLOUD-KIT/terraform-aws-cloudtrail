@@ -13,52 +13,83 @@ Terraform module which creates subnets on AWS.
 Types of resources supported:
 
 * [AWS Cloudtrail](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudtrail)
+* [Cloudwatch Log group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group)
+* [Cloudwatch Log stream](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_stream)
+* [AWS IAM role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)
+* [AWS S3 bucket](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket)
+* [AWS S3 bucket policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_policy)
 
 
 Terraform versions
 ------------------
 
-Terraform >=v0.14
+Terraform >=v0.15
 
 Usage
 ------
 
 ```hcl
-data "aws_caller_identity" "current_account" {}
-
-data "aws_region" "current" {}
-
-locals {
-    cloudtrail_name         = format("%s-cloudtrail", data.aws_region.current.name)
-    cloudwatch_stream       = format("%s_CloudTrail_%s",data.aws_caller_identity.current_account.account_id,data.aws_region.current.name)
-    bucket_name             = "your bucket name"
+provider "aws" {
+  region = "us-east-1"
 }
 
 module "cloudtrail" {
-  source                        = "./cloudtrail"
-  count                         = var.create_cloudtrail == "yes" || var.create_cloudtrail == true ? 1 : 0
-  name                          = local.cloudtrail_name
+  source                        = "OT-CLOUD-KIT/cloudtrail/aws"
+  name                          = "testing"
   enable_logging                = true
   enable_log_file_validation    = true
   include_global_service_events = true
-  s3_bucket_name                = local.bucket_name
-  s3_key_prefix                 = local.cloudtrail_name
-  cloud_watch_log_group_name    = local.cloudtrail_name
-  cloud_watch_logs_role_arn     = "Enter role arn"
-  cloud_watch_log_stream        = local.cloudwatch_stream
-  event_selector = [{
-    read_write_type           = "All"
-    include_management_events = true
+  create_bucket                 = false
+  create_log_group              = false
+  s3_bucket_name                = "testingwaransible"
+  s3_key_prefix                 = "newprefix"
 
-    data_resource = [{
-      type   = "AWS::S3::Object"
-      values = ["arn:aws:s3:::"]
-    }]
-  }]
+  # event_selector = [{
+  #   read_write_type           = "All"
+  #   include_management_events = true
 
-  insight_selector = var.create_cloudwatch_insight_selector ? { insight_type = "ApiCallRateInsight" } : {}
+  #   data_resource = [{
+  #     type   = "AWS::S3::Object"
+  #     values = ["arn:aws:s3:::"]
+  #   }]
+  # }]
+
+  advanced_event_selector = [
+    {
+      field_selector = [
+        {
+          equals = [
+            "Management"
+          ]
+          field           = "eventCategory"
+          
+        }
+      ]
+      name = "event1"
+    },
+    {
+      field_selector = [
+        {
+          equals = [
+            "Data"
+          ]
+          field           = "eventCategory"
+          
+        },
+        {
+            field = "resources.type",
+        equals = [
+          "AWS::S3::Object"
+        ],
+        }
+      ]
+      name = "event2"
+    }
+  ]
+  insight_selector = { insight_type = "ApiCallRateInsight" }
 
 }
+
 ```
 
 Tags
@@ -80,6 +111,13 @@ provider "aws" {
 * Tags are assigned to the resource.
 * Additional tags can be assigned by appending key-value of tag in subnet resource.
 
+Note
+----
+
+1. You can either use event_selector or advanced_event_selector.
+2. If you use s3_bucket_name, create_bucket must be false, and this module will automatically add bucket policy to allow cloudtrail logs into the bucket, and will override any policy already present
+
+
 Inputs
 ------
 | Name | Description | Type | Default | Required |
@@ -89,15 +127,17 @@ Inputs
 | is_multi_region_trail | Specifies whether the trail is created in the current region or in all regions | `bool` | `false` | no |
 | include_global_service_events | Specifies whether the trail is publishing events from global services such as IAM to the log files | `bool` | `false` | no |
 | enable_logging |Enable logging for the trail | `bool` | `true` | no |
-| cloud_watch_logs_role_arn | Specifies the role for the CloudWatch Logs endpoint to assume to write to a user's log group | `string` | `""` | no |
-| cloud_watch_logs_group_arn | Specifies a log group name using an Amazon Resource Name (ARN), that represents the log group to which CloudTrail logs will be delivered | `string` | `""` | no |
-| event_selector | Specifies an event selector for enabling data event logging. | `list(object)` | `[]` | no |
+| create_bucket | If true, it will create a new bucket with policy. If false, you will have to pass a bucket name | `bool` | `true` | yes |
+| s3_bucket_name | Provide S3 bucket name for CloudTrail logs if you specify create_bucket=false | `string` | `""` | no |
+| s3_key_prefix | S3 bucket prefix for CloudTrail logs | `string` | `null` | no |
+| event_selector | Specifies an event selector for enabling data event logging. Conflicts with advanced_event_selector| `list(object)` | `[]` | no |
 | kms_key_arn | The KMS key ARN to use to encrypt the logs delivered by CloudTrail | `string` | `""` | no |
 | is_organization_trail | The trail is an AWS Organizations trail | `bool` | `false` | no |
 | sns_topic_name | Specifies the name of the Amazon SNS topic defined for notification of log file delivery | `string` | `null` | no |
-| tags | Tags for Cloudtrail | `map` | `{Owner: 'test'}` | no |
-| insight_selector | Type of insights to log on a trail. The valid value is ApiCallRateInsight | `map` | `{insight_type: 'ApiCallRateInsight'}` | no |
-| cloud_watch_log_group_name | Name of log group. If this is provided, cloudtrail will be configured with cloudwatch logging. | `string` | `""` | no |
+| tags | Tags for Cloudtrail | `map` | `` | no |
+| insight_selector | Type of insights to log on a trail. The valid value is ApiCallRateInsight | `map` | `{}` | no |
+| create_log_group | If this is provided, cloudtrail will be configured with cloudwatch logging. | `bool` | `true` | no |
+| advanced_event_selector | specifies an advanced event selector for enabling data event logging. Conflicts with event_selector | `list(object)` | `[]` | no |
 
 Output
 ------
@@ -106,6 +146,7 @@ Output
 | id | Name of the trail |
 | arn | ARN of the trail |
 | home_region | Region in which the trail was created |
+
 ### Contributors
 
 [![Prakash Jha][prakash_avatar]][prakash_homepage]<br/>[Prakash Jha][prakash_homepage] 
