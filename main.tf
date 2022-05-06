@@ -1,4 +1,4 @@
-resource "aws_cloudtrail" "cloudtrail" {
+resource "aws_cloudtrail" "default" {
   name                          = var.name
   enable_logging                = var.enable_logging
   s3_bucket_name                = var.create_bucket ? aws_s3_bucket.log_collection[0].id : local.bucket_name
