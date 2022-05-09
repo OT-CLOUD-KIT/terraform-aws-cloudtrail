@@ -8,7 +8,7 @@ AWS Cloudtrail Terraform Module
   [opstree_homepage]: https://opstree.github.io/
   [opstree_avatar]: https://img.cloudposse.com/150x150/https://github.com/opstree.png
 
-Terraform module which creates subnets on AWS.
+Terraform module which configures Cloudtrail on AWS.
 
 Types of resources supported:
 
