@@ -6,6 +6,7 @@ A Terraform module to provision a secure, compliant, and configurable **AWS Clou
 ---
 
 ## Architecture
+<img width="868" height="521" alt="image" src="https://github.com/user-attachments/assets/ff24bf56-1e8a-483e-af64-55a8be0d2c8b" />
 
 
 ---
