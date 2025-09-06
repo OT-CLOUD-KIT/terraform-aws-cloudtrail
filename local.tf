@@ -1,15 +1,11 @@
 locals {
   # Standard tag components
-  base_name = "${var.bu}-${var.program}-${var.app}-${var.env}"
+  base_name = "${var.env}- ${n}"
 
   common_tags = {
-    "BusinessUnit" = var.bu
-    "Program"      = var.program
-    "Application"  = var.app
-    "Environment"  = var.env
-    "Team"         = var.team
-     "region"       = var.region
-    "ManagedBy"    = "Terraform"
+    env =  var.env
+    owner = var.owner
+    app = var.app
   }
 
   # Local variables
