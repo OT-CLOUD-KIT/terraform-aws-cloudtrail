@@ -1,155 +1,131 @@
-AWS Cloudtrail Terraform Module
-=====================================
+# Terraform AWS CloudTrail
 
-[![Opstree Solutions][opstree_avatar]][opstree_homepage]
-
-[Opstree Solutions][opstree_homepage] 
-
-  [opstree_homepage]: https://opstree.github.io/
-  [opstree_avatar]: https://img.cloudposse.com/150x150/https://github.com/opstree.png
-
-Terraform module which configures Cloudtrail on AWS.
-
-Types of resources supported:
-
-* [AWS Cloudtrail](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudtrail)
-* [Cloudwatch Log group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group)
-* [Cloudwatch Log stream](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_stream)
-* [AWS IAM role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)
-* [AWS S3 bucket](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket)
-* [AWS S3 bucket policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_policy)
+A Terraform module to provision a secure, compliant, and configurable **AWS CloudTrail** setup. This module supports logging to S3, CloudWatch, SNS notifications, and advanced event selectors for fine-grained data control.
 
 
-Terraform versions
-------------------
+---
 
-Terraform >=v0.15
+## Architecture
+<img width="868" height="521" alt="image" src="https://github.com/user-attachments/assets/ff24bf56-1e8a-483e-af64-55a8be0d2c8b" />
 
-Usage
-------
+
+---
+## Providers
+
+| Name                                              | Version  |
+|---------------------------------------------------|----------|
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 5.82.2   |
+| <a name="terraform_module"></a> [Terraform](Terraform\module) | >= 1.12.1|
+
+---
+
+## Usage
 
 ```hcl
-provider "aws" {
-  region = "us-east-1"
-}
-
 module "cloudtrail" {
-  source                        = "OT-CLOUD-KIT/cloudtrail/aws"
-  name                          = "testing"
+  source = "OT-CLOUD-KIT/terraform-aws-cloudtrail"
+
+  name                          = "ntd-cloudtrail"
+  create_bucket                 = true
+  bucket_name                   = "" 
+  s3_key_prefix                 = "logs"
   enable_logging                = true
   enable_log_file_validation    = true
+  is_multi_region_trail         = true
   include_global_service_events = true
-  create_bucket                 = false
-  create_log_group              = false
-  s3_bucket_name                = "testingwaransible"
-  s3_key_prefix                 = "newprefix"
+  create_log_group              = true
+  create_sns_topic              = true
+  sns_topic_name                = "ntd-cloudtrail-topic"
+  kms_key_arn                   = "" 
+  is_organization_trail         = false
+  force_destroy                 = true
+  block_public_acls             = true
+  block_public_policy           = true
+  ignore_public_acls            = true
+  restrict_public_buckets       = true
 
-  # event_selector = [{
-  #   read_write_type           = "All"
-  #   include_management_events = true
-
-  #   data_resource = [{
-  #     type   = "AWS::S3::Object"
-  #     values = ["arn:aws:s3:::"]
-  #   }]
-  # }]
-
-  advanced_event_selector = [
+  event_selector = [
     {
-      field_selector = [
+      include_management_events = true
+      read_write_type           = "All"
+      data_resource = [
         {
-          equals = [
-            "Management"
-          ]
-          field           = "eventCategory"
-          
+          type   = "AWS::S3::Object"
+          values = ["arn:aws:s3:::example-bucket/"]
         }
       ]
-      name = "event1"
-    },
-    {
-      field_selector = [
-        {
-          equals = [
-            "Data"
-          ]
-          field           = "eventCategory"
-          
-        },
-        {
-            field = "resources.type",
-        equals = [
-          "AWS::S3::Object"
-        ],
-        }
-      ]
-      name = "event2"
     }
   ]
-  insight_selector = { insight_type = "ApiCallRateInsight" }
 
+  advanced_event_selector = []
+
+  insight_selector = ["ApiCallRateInsight"]
 }
 
 ```
-
-Tags
-----
-* Default Tags are an easy way to standardize your Terraform Configuration in accordance with AWS’s recommended best practices. We have used the new AWS provider (v3.38.0) feature which allows default_tags to be mentioned in the provider block and will be inherited by dependent Terraform resources and modules
-
-Usage:
-```
-provider "aws" {
-  region = var.region
-  default_tags {
-    tags = {
-      Owner       = "TFProviders"
-      Project     = "Test"
-      }
-    }
-}
-```
-* Tags are assigned to the resource.
-* Additional tags can be assigned by appending key-value of tag in subnet resource.
-
-Note
-----
-
-1. You can either use event_selector or advanced_event_selector.
-2. If you use s3_bucket_name, create_bucket must be false, and this module will automatically add bucket policy to allow cloudtrail logs into the bucket, and will override any policy already present
+> **Note:**  
+> The above example demonstrates how to use the module. All variables, resources, and outputs used here are already defined within this module.
 
 
-Inputs
-------
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| name | Name of the cloudtrail | `string` | `"cloudtrail"` | yes |
-| enable_log_file_validation | Specifies whether log file integrity validation is enabled. Creates signed digest for validated contents of logs  | `bool` | `true` | no |
-| is_multi_region_trail | Specifies whether the trail is created in the current region or in all regions | `bool` | `false` | no |
-| include_global_service_events | Specifies whether the trail is publishing events from global services such as IAM to the log files | `bool` | `false` | no |
-| enable_logging |Enable logging for the trail | `bool` | `true` | no |
-| create_bucket | If true, it will create a new bucket with policy. If false, you will have to pass a bucket name | `bool` | `true` | yes |
-| s3_bucket_name | Provide S3 bucket name for CloudTrail logs if you specify create_bucket=false | `string` | `""` | no |
-| s3_key_prefix | S3 bucket prefix for CloudTrail logs | `string` | `null` | no |
-| event_selector | Specifies an event selector for enabling data event logging. Conflicts with advanced_event_selector| `list(object)` | `[]` | no |
-| kms_key_arn | The KMS key ARN to use to encrypt the logs delivered by CloudTrail | `string` | `""` | no |
-| is_organization_trail | The trail is an AWS Organizations trail | `bool` | `false` | no |
-| sns_topic_name | Specifies the name of the Amazon SNS topic defined for notification of log file delivery | `string` | `null` | no |
-| tags | Tags for Cloudtrail | `map` | `` | no |
-| insight_selector | Type of insights to log on a trail. The valid value is ApiCallRateInsight | `map` | `{}` | no |
-| create_log_group | If this is provided, cloudtrail will be configured with cloudwatch logging. | `bool` | `true` | no |
-| advanced_event_selector | specifies an advanced event selector for enabling data event logging. Conflicts with event_selector | `list(object)` | `[]` | no |
+## Resources
 
-Output
-------
-| Name | Description |
-|------|-------------|
-| id | Name of the trail |
-| arn | ARN of the trail |
-| home_region | Region in which the trail was created |
+| Name                                                                                                                                                                | Type     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| [random\_pet.name](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/pet)                                                              | Resource |
+| [aws\_s3\_bucket.log\_collection](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket)                                            | Resource |
+| [aws\_s3\_bucket\_public\_access\_block.log\_collection](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_public_access_block) | Resource |
+| [aws\_s3\_bucket\_policy.bucket\_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_policy)                              | Resource |
+| [aws\_cloudwatch\_log\_group.log\_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group)                          | Resource |
+| [aws\_cloudwatch\_log\_stream.log\_stream](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_stream)                       | Resource |
+| [aws\_iam\_role.role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)                                                         | Resource |
+| [aws\_iam\_role\_policy.cloudtrail\_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy)                            | Resource |
+| [aws\_sns\_topic.cloudtrail\_sns](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic)                                            | Resource |
+| [aws\_sns\_topic\_policy.cloudtrail\_sns\_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic_policy)                     | Resource |
+| [aws\_cloudtrail.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudtrail)                                                   | Resource |
 
-### Contributors
 
-[![Prakash Jha][prakash_avatar]][prakash_homepage]<br/>[Prakash Jha][prakash_homepage] 
+___
 
-  [prakash_homepage]: https://github.com/prakashjha-ot
-  [prakash_avatar]: https://img.cloudposse.com/75x75/https://github.com/prakashjha-ot.png
+## Input
+
+| Name                                                                                                                        | Description                                                                               | Type           | Default                  | Required |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------- | ------------------------ | :------: |
+| <a name="input_name"></a> [name](#input_name)                                                                               | Name of the CloudTrail trail                                                              | `string`       | `"cloudtrail"`           |    yes   |
+| <a name="input_create_bucket"></a> [create\_bucket](#input_create_bucket)                                                   | Whether to create a new S3 bucket for CloudTrail logs                                     | `bool`         | `true`                   |    yes   |
+| <a name="input_s3_key_prefix"></a> [s3\_key\_prefix](#input_s3_key_prefix)                                                  | S3 prefix for storing CloudTrail logs                                                     | `string`       | `"logs"`                 |    no    |
+| <a name="input_enable_logging"></a> [enable\_logging](#input_enable_logging)                                                | Enable logging for the CloudTrail trail                                                   | `bool`         | `true`                   |    no    |
+| <a name="input_enable_log_file_validation"></a> [enable\_log\_file\_validation](#input_enable_log_file_validation)          | Enable log file validation for CloudTrail                                                 | `bool`         | `true`                   |    no    |
+| <a name="input_create_log_group"></a> [create\_log\_group](#input_create_log_group)                                         | Whether to create a CloudWatch Log Group                                                  | `bool`         | `true`                   |    no    |
+| <a name="input_create_sns_topic"></a> [create\_sns\_topic](#input_create_sns_topic)                                         | Whether to create an SNS topic for log delivery notifications                             | `bool`         | `true`                   |    no    |
+| <a name="input_sns_topic_name"></a> [sns\_topic\_name](#input_sns_topic_name)                                               | Name of the SNS topic                                                                     | `string`       | `"ntd-cloudtrail-topic"` |    no    |
+| <a name="input_is_multi_region_trail"></a> [is\_multi\_region\_trail](#input_is_multi_region_trail)                         | Whether the trail is multi-region                                                         | `bool`         | `true`                   |    no    |
+| <a name="input_include_global_service_events"></a> [include\_global\_service\_events](#input_include_global_service_events) | Include global service events like IAM                                                    | `bool`         | `true`                   |    no    |
+| <a name="input_is_organization_trail"></a> [is\_organization\_trail](#input_is_organization_trail)                          | Whether the trail is an AWS Organization trail                                            | `bool`         | `false`                  |    no    |
+| <a name="input_kms_key_arn"></a> [kms\_key\_arn](#input_kms_key_arn)                                                        | KMS key ARN for encrypting CloudTrail logs                                                | `string`       | `""`                     |    no    |
+| <a name="input_force_destroy"></a> [force\_destroy](#input_force_destroy)                                                   | Whether to force destroy S3 bucket with all objects                                       | `bool`         | `true`                   |    no    |
+| <a name="input_block_public_acls"></a> [block\_public\_acls](#input_block_public_acls)                                      | Block public ACLs for the S3 bucket                                                       | `bool`         | `true`                   |    no    |
+| <a name="input_block_public_policy"></a> [block\_public\_policy](#input_block_public_policy)                                | Block public bucket policies                                                              | `bool`         | `true`                   |    no    |
+| <a name="input_ignore_public_acls"></a> [ignore\_public\_acls](#input_ignore_public_acls)                                   | Ignore public ACLs for S3 bucket                                                          | `bool`         | `true`                   |    no    |
+| <a name="input_restrict_public_buckets"></a> [restrict\_public\_buckets](#input_restrict_public_buckets)                    | Restrict bucket from becoming public                                                      | `bool`         | `true`                   |    no    |
+| <a name="input_event_selector"></a> [event\_selector](#input_event_selector)                                                | Event selector for enabling data event logging (conflicts with `advanced_event_selector`) | `list(object)` | `[]`                     |    no    |
+| <a name="input_advanced_event_selector"></a> [advanced\_event\_selector](#input_advanced_event_selector)                    | Advanced event selector for enabling data event logging (conflicts with `event_selector`) | `list(object)` | `[]`                     |    no    |
+| <a name="input_insight_selector"></a> [insight\_selector](#input_insight_selector)                                          | Type of insights to log (e.g., `ApiCallRateInsight`)                                      | `list(string)` | `[]`                     |    no    |
+
+___
+
+## Output
+
+| Name                                                                                                              | Description                                          |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| <a name="output_cloudtrail_arn"></a> [cloudtrail\_arn](#output_cloudtrail_arn)                                    | ARN of the CloudTrail                                |
+| <a name="output_s3_bucket_name"></a> [s3\_bucket\_name](#output_s3_bucket_name)                                   | S3 bucket used for storing CloudTrail logs           |
+| <a name="output_cloudwatch_log_group_name"></a> [cloudwatch\_log\_group\_name](#output_cloudwatch_log_group_name) | CloudWatch Log Group used by CloudTrail (if enabled) |
+| <a name="output_sns_topic_arn"></a> [sns\_topic\_arn](#output_sns_topic_arn)                                      | ARN of the SNS topic                    |
+
+___
+
+## Contributors
+
+- [Piyush Upadhyay](https://github.com/piiiyuushh)
+- [Nikita Joshi](https://github.com/jnikita19)
+
